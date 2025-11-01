@@ -10,9 +10,15 @@
 - **Docker Compose**: Version 2.0+
 
 ### Port Requirements
-- **3000**: Port default aplikasi
+- **3000**: Port default aplikasi (Next.js)
+- **8080**: Port Docker host mapping (dikonfigurasi di docker-compose.yml)
 - **80**: Port Nginx (jika menggunakan production mode)
 - **443**: Port SSL (jika menggunakan production mode)
+
+**⚠️ Port Conflict Check:**
+- Saat ini port 3000 dan 8080 sudah digunakan oleh proses lain
+- Docker menggunakan mapping **8080:3000** (host:container)
+- Jika ada konflik, ubah port host di `docker-compose.yml`
 
 ## 🚀 Cara Deploy
 
@@ -82,13 +88,27 @@ PORT=3000
 
 ### Custom Port
 
-Edit `docker-compose.yml`:
+**🔍 Rekomendasi Port Aman:**
+- **8081-8090**: Range port yang biasanya aman
+- **9000-9010**: Alternative port range
+- **3001**: Port alternatif untuk development
+
+Edit `docker-compose.yml` untuk ganti port:
 
 ```yaml
 services:
   quran-app:
     ports:
-      - "8080:3000"  # Gunakan port 8080 di host
+      - "8081:3000"  # Gunakan port 8081 di host (contoh)
+```
+
+**Cek port availability:**
+```bash
+# Cek port yang digunakan
+ss -tuln | grep :8081  # ganti dengan port yang diinginkan
+
+# Atau gunakan netstat
+sudo netstat -tlnp | grep :8081
 ```
 
 ### SSL/HTTPS Setup
@@ -196,13 +216,16 @@ sudo ufw allow 443   # Jika menggunakan HTTPS
 
 #### 1. Port Already in Use
 ```bash
-# Cari proses yang menggunakan port 3000
-sudo lsof -i :3000
+# Cari proses yang menggunakan port tertentu
+sudo lsof -i :8080  # atau port yang dikonfigurasi
 
 # Kill proses
 sudo kill -9 <PID>
 
-# Atau gunakan port lain
+# Atau gunakan port lain (rekomendasi: 8081-8090)
+# Edit docker-compose.yml:
+# ports:
+#   - "8081:3000"  # ganti 8081 dengan port yang aman
 ```
 
 #### 2. Docker Permission Denied
@@ -300,15 +323,25 @@ docker run -d \
 
 ## ✅ Deployment Checklist
 
+### Pre-Deployment
 - [ ] Docker dan Docker Compose terinstall
-- [ ] Port 3000 tersedia
+- [ ] **Port availability checked** (gunakan port 8081-8090 jika 8080 bentrok)
 - [ ] Repository berhasil di-clone
+- [ ] `.gitignore` sudah dikonfigurasi dengan benar
+
+### Post-Deployment
 - [ ] Image berhasil di-build
 - [ ] Containers berjalan normal
-- [ ] Aplikasi accessible di browser
+- [ ] Aplikasi accessible di browser (http://localhost:8080 atau port yang dikonfigurasi)
 - [ ] Audio playback berfungsi
 - [ ] Dark mode toggle bekerja
 - [ ] Search functionality normal
 - [ ] Bookmark feature working
+
+### Production Setup (Optional)
+- [ ] SSL certificate installed
+- [ ] Nginx reverse proxy configured
+- [ ] Port 80/443 forwarded correctly
+- [ ] HTTPS redirect working
 
 Deployment selesai! 🎉

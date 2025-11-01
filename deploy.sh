@@ -51,18 +51,58 @@ check_docker() {
 
 # Check if ports are available
 check_ports() {
-    local port=3000
-    if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
-        print_warning "Port $port is already in use"
+    local docker_host_port=8080
+    local internal_port=3000
+
+    echo
+    print_status "Checking port availability..."
+
+    # Check current port configuration
+    local current_port=$(grep -o '[0-9]\+:3000' docker-compose.yml | cut -d: -f1)
+    print_status "Current port configuration: $current_port:3000"
+
+    # Check if the port is already in use
+    if lsof -Pi :$current_port -sTCP:LISTEN -t >/dev/null 2>&1; then
+        print_warning "Port $current_port is already in use!"
+        echo
+        echo "🔍 Available port recommendations:"
+        echo "   • 8081-8090: Usually safe range"
+        echo "   • 9000-9010: Alternative range"
+        echo "   • 3001: For development"
+        echo
+
         read -p "Do you want to use a different port? (y/n): " -n 1 -r
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
-            read -p "Enter port number: " new_port
-            # Update docker-compose.yml with new port
-            sed -i "s/3000:3000/$new_port:3000/g" docker-compose.yml
-            print_success "Updated port to $new_port"
+            while true; do
+                read -p "Enter new port number (recommended: 8081-8090): " new_port
+
+                # Validate port number
+                if ! [[ "$new_port" =~ ^[0-9]+$ ]] || [ "$new_port" -lt 1024 ] || [ "$new_port" -gt 65535 ]; then
+                    print_error "Invalid port number. Please enter a port between 1024 and 65535."
+                    continue
+                fi
+
+                # Check if new port is available
+                if lsof -Pi :$new_port -sTCP:LISTEN -t >/dev/null 2>&1; then
+                    print_warning "Port $new_port is also in use. Please try another port."
+                else
+                    # Update docker-compose.yml with new port
+                    sed -i "s/$current_port:3000/$new_port:3000/g" docker-compose.yml
+                    print_success "Updated port to $new_port:3000"
+                    current_port=$new_port
+                    break
+                fi
+            done
+        else
+            print_warning "Continuing with port $current_port (may cause conflicts)"
         fi
+    else
+        print_success "Port $current_port is available"
     fi
+
+    echo "✅ Port check completed"
+    echo
 }
 
 # Build and deploy
@@ -88,19 +128,20 @@ deploy_app() {
 
 # Show deployment info
 show_info() {
-    local port=$(grep -o '^[[:space:]]*[0-9]\+:3000' docker-compose.yml | cut -d: -f1)
+    local port=$(grep -o '[0-9]\+:3000' docker-compose.yml | cut -d: -f1)
 
     echo
     print_success "🎉 Deployment completed successfully!"
     echo
     echo "📖 Al-Qur'an Digital Web App is now running at:"
-    echo "   http://localhost:$port"
+    echo "   🌐 http://localhost:$port"
     echo
     echo "🔧 Management Commands:"
     echo "   View logs:    docker-compose logs -f"
     echo "   Stop app:     docker-compose down"
     echo "   Restart app:  docker-compose restart"
     echo "   Update app:   docker-compose pull && docker-compose up -d"
+    echo "   Check status: docker-compose ps"
     echo
     echo "📱 Features:"
     echo "   ✅ Complete Quran with 114 Surahs"
@@ -109,6 +150,12 @@ show_info() {
     echo "   ✅ Search and Bookmark features"
     echo "   ✅ Dark/Light mode"
     echo "   ✅ Responsive design"
+    echo "   ✅ Fast loading with Next.js"
+    echo
+    echo "🚨 Important Notes:"
+    echo "   • Port $port is mapped to container port 3000"
+    echo "   • Application runs in production mode"
+    echo "   • All data is stored client-side (localStorage)"
     echo
     print_status "Opening application in browser..."
 
@@ -119,6 +166,8 @@ show_info() {
         open http://localhost:$port
     elif command -v start &> /dev/null; then
         start http://localhost:$port
+    else
+        print_status "Please open http://localhost:$port manually in your browser"
     fi
 }
 
